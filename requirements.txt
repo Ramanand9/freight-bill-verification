@@ -1,0 +1,27 @@
+# Web framework + server
+fastapi==0.137.2
+uvicorn[standard]==0.49.0
+starlette==1.3.1
+
+# Data validation / settings
+pydantic==2.13.4
+pydantic-settings==2.14.1
+
+# ORM (SQLite now, Postgres-ready)
+SQLAlchemy==2.0.51
+
+# Agent workflow + durable checkpointing
+langgraph==1.2.5
+langgraph-checkpoint==4.1.1
+langgraph-checkpoint-sqlite==3.1.0
+
+# Graph modelling
+networkx==3.6.1
+
+# Config / misc
+python-dotenv==1.2.2
+anyio==4.14.0
+
+# Tests
+pytest==9.1.0
+httpx==0.28.1
