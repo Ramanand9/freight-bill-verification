@@ -127,4 +127,3 @@ pytest -q
 - `tests` contains the automated tests.
 - `seed_data.json` contains the sample logistics data used for the demo.
 
-The earlier, more technical version of this documentation is still available in [`README_old.md`](README_old.md).
