@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Freight Bill Verification — Ops Console</title>
+<style>
+  :root{
+    --paper:#eef1f4; --surface:#ffffff; --ink:#16202a; --ink-soft:#5a6b78;
+    --rule:#d6dce2; --rule-strong:#b9c2cb; --field:#f6f8fa;
+    --approve:#1b7a4b; --flag:#b07614; --dispute:#b23a3a; --review:#2f5da6;
+    --approve-bg:#e7f3ec; --flag-bg:#f7efe0; --dispute-bg:#f6e7e7; --review-bg:#e7eef8;
+    --info:#6b7785; --warning:#b07614; --critical:#b23a3a;
+    --mono:"JetBrains Mono","SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:var(--review)}
+  button{font-family:inherit}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600}
+
+  /* top bar */
+  header{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;
+    border-bottom:3px solid #0a1014}
+  .bar{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;
+    align-items:center;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;margin-right:auto}
+  .seal{width:34px;height:34px;border:2px solid #fff;border-radius:50%;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:700;
+    font-size:13px;letter-spacing:.02em}
+  .brand h1{font-size:13.5px;letter-spacing:.12em;text-transform:uppercase;
+    margin:0;font-weight:700}
+  .brand p{margin:0;font-size:11px;color:#9fb0bd;letter-spacing:.04em}
+  .status{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#c4d0da;
+    font-family:var(--mono)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#5a6b78}
+  .dot.live{background:#37c97f;box-shadow:0 0 0 3px rgba(55,201,127,.2)}
+  .dot.down{background:#e0544e;box-shadow:0 0 0 3px rgba(224,84,78,.2)}
+  .btn{border:1px solid rgba(255,255,255,.32);background:transparent;color:#fff;
+    padding:7px 13px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;
+    letter-spacing:.02em;transition:background .12s,border-color .12s}
+  .btn:hover{background:rgba(255,255,255,.1)}
+  .btn:focus-visible{outline:2px solid #8fb4ff;outline-offset:2px}
+  .btn.solid{background:#fff;color:var(--ink);border-color:#fff}
+  .btn.solid:hover{background:#dfe6ec}
+  .btn.danger{border-color:rgba(224,84,78,.55);color:#ffc9c6}
+  .btn.danger:hover{background:rgba(224,84,78,.16)}
+
+  /* metrics strip */
+  .metrics{max-width:1240px;margin:0 auto;padding:10px 20px 0;display:flex;
+    gap:10px;flex-wrap:wrap}
+  .chip{background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+    padding:7px 12px;display:flex;align-items:center;gap:9px;min-width:118px}
+  .chip .n{font-family:var(--mono);font-size:18px;font-weight:700;line-height:1}
+  .chip .l{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+  .chip .swatch{width:4px;align-self:stretch;border-radius:2px}
+
+  main{max-width:1240px;margin:0 auto;padding:18px 20px 60px}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:18px}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}}
+
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:8px;
+    overflow:hidden}
+  .panel>h2{margin:0;font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:700;padding:13px 16px;border-bottom:1px solid var(--rule);
+    background:linear-gradient(var(--field),#fff);display:flex;align-items:center;
+    justify-content:space-between;gap:8px}
+  .panel .body{padding:16px}
+
+  /* submit panel */
+  label.fld{display:block;margin-bottom:5px}
+  select,textarea,input[type=text]{width:100%;font-family:var(--mono);font-size:12.5px;
+    color:var(--ink);background:var(--field);border:1px solid var(--rule-strong);
+    border-radius:6px;padding:9px 10px}
+  select{cursor:pointer}
+  textarea{min-height:268px;resize:vertical;line-height:1.55;tab-size:2}
+  select:focus,textarea:focus,input:focus{outline:2px solid #aac2f0;outline-offset:0;
+    border-color:var(--review)}
+  .scenario{font-size:12px;color:var(--ink-soft);background:var(--field);
+    border-left:3px solid var(--rule-strong);padding:8px 11px;border-radius:0 5px 5px 0;
+    margin:10px 0 12px;min-height:18px}
+  .row{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .primary{background:var(--ink);color:#fff;border:1px solid var(--ink);padding:10px 18px;
+    border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.02em}
+  .primary:hover{background:#0c151c}
+  .primary:focus-visible{outline:2px solid #8fb4ff;outline-offset:2px}
+  .ghost{background:none;border:none;color:var(--review);font-size:12px;cursor:pointer;
+    font-weight:600;padding:6px}
+  .err{color:var(--dispute);font-size:12px;font-family:var(--mono);margin-top:9px;
+    white-space:pre-wrap;display:none}
+
+  /* verdict stamp */
+  .verdict-empty{color:var(--ink-soft);font-size:13px;padding:18px 4px;text-align:center}
+  .stamp{position:relative;border:2px solid var(--rule-strong);border-radius:8px;
+    padding:16px 18px;margin-bottom:14px;overflow:hidden}
+  .stamp[data-d=auto_approve]{border-color:var(--approve);background:var(--approve-bg)}
+  .stamp[data-d=flag_for_review]{border-color:var(--flag);background:var(--flag-bg)}
+  .stamp[data-d=dispute]{border-color:var(--dispute);background:var(--dispute-bg)}
+  .stamp[data-d=human_review]{border-color:var(--review);background:var(--review-bg)}
+  .stamp .ring{position:absolute;right:-26px;top:50%;transform:translateY(-50%) rotate(-14deg);
+    width:150px;height:150px;border:6px double currentColor;border-radius:50%;opacity:.10;
+    pointer-events:none}
+  .stamp .billno{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:.04em}
+  .stamp .decision{font-size:27px;font-weight:800;letter-spacing:-.01em;margin:2px 0 0;
+    text-transform:capitalize}
+  .stamp[data-d=auto_approve] .decision{color:var(--approve)}
+  .stamp[data-d=flag_for_review] .decision{color:var(--flag)}
+  .stamp[data-d=dispute] .decision{color:var(--dispute)}
+  .stamp[data-d=human_review] .decision{color:var(--review)}
+  .stamp .statusline{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    font-weight:700;color:var(--ink-soft);margin-top:3px}
+  .meter{margin-top:13px}
+  .meter .track{height:9px;background:rgba(22,32,42,.1);border-radius:5px;overflow:hidden}
+  .meter .fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+  .stamp[data-d=auto_approve] .meter .fill{background:var(--approve)}
+  .stamp[data-d=flag_for_review] .meter .fill{background:var(--flag)}
+  .stamp[data-d=dispute] .meter .fill{background:var(--dispute)}
+  .stamp[data-d=human_review] .meter .fill{background:var(--review)}
+  .meter .mlab{display:flex;justify-content:space-between;font-size:10.5px;
+    color:var(--ink-soft);margin-top:5px;letter-spacing:.06em;text-transform:uppercase}
+  .meter .mlab b{font-family:var(--mono);font-size:13px;color:var(--ink)}
+
+  .matched{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .ent{font-family:var(--mono);font-size:11px;background:var(--field);
+    border:1px solid var(--rule);border-radius:5px;padding:5px 9px}
+  .ent .k{color:var(--ink-soft);margin-right:6px;font-size:9.5px;letter-spacing:.08em;
+    text-transform:uppercase}
+  .ent.null .v{color:var(--ink-soft);font-style:italic}
+
+  .subhead{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;margin:0 0 8px;padding-top:4px;border-top:1px dashed var(--rule)}
+  .issues{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:7px}
+  .issue{display:flex;gap:9px;align-items:baseline;background:var(--field);
+    border:1px solid var(--rule);border-radius:6px;padding:8px 10px}
+  .sev{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+    padding:2px 6px;border-radius:4px;flex:none;margin-top:1px}
+  .sev.info{background:#e8ecef;color:var(--info)}
+  .sev.warning{background:var(--flag-bg);color:var(--warning)}
+  .sev.critical{background:var(--dispute-bg);color:var(--critical)}
+  .issue .code{font-family:var(--mono);font-size:11px;font-weight:600}
+  .issue .msg{color:var(--ink-soft);font-size:12px;display:block;margin-top:1px}
+  .none{color:var(--ink-soft);font-size:12.5px;font-style:italic;margin:0 0 14px}
+  .evidence{list-style:none;margin:0;padding:0;counter-reset:ev}
+  .evidence li{position:relative;padding:5px 0 5px 26px;font-size:12.5px;color:var(--ink);
+    border-bottom:1px dotted var(--rule)}
+  .evidence li:last-child{border-bottom:none}
+  .evidence li::before{counter-increment:ev;content:counter(ev,decimal-leading-zero);
+    position:absolute;left:0;top:5px;font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
+
+  /* lower: queue + chain */
+  .lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:18px}
+  @media(max-width:920px){.lower{grid-template-columns:1fr}}
+  .qitem{border:1px solid var(--rule);border-radius:7px;padding:11px 13px;margin-bottom:10px}
+  .qitem:last-child{margin-bottom:0}
+  .qtop{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .qtop .id{font-family:var(--mono);font-size:12.5px;font-weight:700}
+  .tag{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    padding:3px 7px;border-radius:4px}
+  .tag.flag_for_review{background:var(--flag-bg);color:var(--flag)}
+  .tag.human_review{background:var(--review-bg);color:var(--review)}
+  .qmeta{font-size:11.5px;color:var(--ink-soft);margin:4px 0 8px;font-family:var(--mono)}
+  .qissues{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+  .qissues span{font-family:var(--mono);font-size:10px;background:var(--field);
+    border:1px solid var(--rule);border-radius:4px;padding:2px 6px;color:var(--ink-soft)}
+  .review-row{display:flex;gap:7px;align-items:stretch;flex-wrap:wrap}
+  .review-row input{flex:1;min-width:150px}
+  .ra{padding:7px 11px;border-radius:5px;font-size:11.5px;font-weight:700;cursor:pointer;
+    border:1px solid;letter-spacing:.02em}
+  .ra.approve{border-color:var(--approve);color:var(--approve);background:var(--approve-bg)}
+  .ra.dispute{border-color:var(--dispute);color:var(--dispute);background:var(--dispute-bg)}
+  .ra.modify{border-color:var(--ink-soft);color:var(--ink-soft);background:var(--field)}
+  .ra:hover{filter:brightness(.97)}
+  .ra:focus-visible{outline:2px solid #8fb4ff;outline-offset:1px}
+
+  .timeline{list-style:none;margin:0;padding:0}
+  .timeline li{position:relative;padding:0 0 16px 22px;border-left:2px solid var(--rule);
+    margin-left:5px}
+  .timeline li:last-child{border-left-color:transparent;padding-bottom:0}
+  .timeline li::before{content:"";position:absolute;left:-7px;top:2px;width:12px;height:12px;
+    border-radius:50%;background:#fff;border:2px solid var(--rule-strong)}
+  .timeline li.final::before{border-color:var(--ink);background:var(--ink)}
+  .timeline .when{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft)}
+  .timeline .what{font-size:13px;font-weight:600;margin-top:1px}
+  .timeline .what .badge{font-family:var(--mono);font-size:10px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;border-radius:4px;
+    margin-left:6px;background:var(--field);border:1px solid var(--rule);color:var(--ink-soft)}
+  .audit{list-style:none;margin:10px 0 0;padding:0;font-family:var(--mono);font-size:11.5px}
+  .audit li{display:flex;gap:9px;padding:4px 0;color:var(--ink-soft);border-bottom:1px dotted var(--rule)}
+  .audit li:last-child{border:none}
+  .audit .ev{color:var(--ink);font-weight:600}
+
+  /* run-all table */
+  .runtable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  .runtable th{text-align:left;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-soft);padding:6px 8px;border-bottom:1px solid var(--rule-strong)}
+  .runtable td{padding:7px 8px;border-bottom:1px solid var(--rule);font-family:var(--mono)}
+  .runtable tr{cursor:pointer}
+  .runtable tr:hover td{background:var(--field)}
+  .pill{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.04em;padding:2px 7px;border-radius:4px}
+  .pill.auto_approve{background:var(--approve-bg);color:var(--approve)}
+  .pill.flag_for_review{background:var(--flag-bg);color:var(--flag)}
+  .pill.dispute{background:var(--dispute-bg);color:var(--dispute)}
+  .pill.human_review{background:var(--review-bg);color:var(--review)}
+  .hidden{display:none}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);
+    color:#fff;padding:10px 18px;border-radius:7px;font-size:13px;z-index:50;opacity:0;
+    transition:opacity .2s,transform .2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <div class="seal">FV</div>
+      <div>
+        <h1>Freight Bill Verification</h1>
+        <p>Carrier invoice audit &middot; ops console</p>
+      </div>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="conn">connecting…</span></div>
+    <button class="btn solid" id="runAll">Run all 10 seeds</button>
+    <button class="btn danger" id="reset">Reset demo</button>
+  </div>
+  <div class="metrics" id="metrics"></div>
+  <div style="height:10px"></div>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- SUBMIT -->
+    <section class="panel">
+      <h2>Submit a bill <span class="eyebrow">editable</span></h2>
+      <div class="body">
+        <label class="fld eyebrow" for="seed">Seed scenario</label>
+        <select id="seed"><option value="">— choose a bill —</option></select>
+        <div class="scenario" id="scenario">Pick a seed bill to load its payload, or paste your own. Edit any field below before verifying.</div>
+        <label class="fld eyebrow" for="payload">Bill payload (JSON)</label>
+        <textarea id="payload" spellcheck="false" placeholder="{ ... freight bill JSON ... }"></textarea>
+        <div class="err" id="err"></div>
+        <div class="row">
+          <button class="primary" id="verify">Verify bill</button>
+          <button class="ghost" id="revert">Reset to seed</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VERDICT -->
+    <section class="panel">
+      <h2>Verdict <span class="eyebrow" id="verdictId"></span></h2>
+      <div class="body" id="verdict">
+        <div class="verdict-empty">No bill verified yet. Submit one on the left to see the decision, confidence, issues, and the evidence trail.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- RUN ALL results -->
+  <section class="panel hidden" id="runPanel" style="margin-top:18px">
+    <h2>All seed bills <span class="eyebrow">click a row to inspect</span></h2>
+    <div class="body" style="padding-top:10px">
+      <table class="runtable"><thead><tr>
+        <th>Bill</th><th>Status</th><th>Decision</th><th>Confidence</th><th>Issues</th>
+      </tr></thead><tbody id="runBody"></tbody></table>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="panel">
+      <h2>Review queue <span class="eyebrow" id="qCount"></span></h2>
+      <div class="body" id="queue"><div class="none">Loading…</div></div>
+    </section>
+    <section class="panel">
+      <h2>Evidence chain <span class="eyebrow" id="chainId"></span></h2>
+      <div class="body" id="chain"><div class="none">Select or verify a bill to see its decision history and audit trail.</div></div>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = ""; // same origin as the FastAPI server
+const $ = s => document.querySelector(s);
+let seeds = {};            // id -> {scenario, payload}
+let focused = null;        // currently inspected bill id
+
+const titleCase = s => (s||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+const fmtConf = c => (c==null?"—":Math.round(c*100)+"%");
+
+async function api(path, opts){
+  const r = await fetch(API+path, Object.assign({headers:{"Content-Type":"application/json"}}, opts||{}));
+  const txt = await r.text();
+  let data; try{ data = txt?JSON.parse(txt):null; }catch(e){ data = txt; }
+  if(!r.ok){ const m = (data && data.detail) ? data.detail : ("HTTP "+r.status); throw new Error(typeof m==="string"?m:JSON.stringify(m)); }
+  return data;
+}
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+
+/* ---------- bootstrap ---------- */
+async function boot(){
+  try{
+    const root = await api("/");
+    $("#dot").classList.add("live"); $("#conn").textContent = "connected";
+  }catch(e){
+    $("#dot").classList.add("down"); $("#conn").textContent = "backend offline";
+    return;
+  }
+  await loadSeeds(); await refresh();
+}
+async function loadSeeds(){
+  const list = await api("/seed-bills");
+  const sel = $("#seed");
+  list.forEach(s=>{
+    seeds[s.id] = {scenario:s.scenario, payload:s.payload};
+    const o=document.createElement("option"); o.value=s.id;
+    o.textContent = s.id + " — " + shortLabel(s.scenario, s.id);
+    sel.appendChild(o);
+  });
+}
+function shortLabel(sc, id){
+  if(!sc) return id;
+  const first = sc.split("—")[0].split(".")[0].trim();
+  return first.length>46 ? first.slice(0,44)+"…" : first;
+}
+function loadSeedIntoEditor(id){
+  const s = seeds[id]; if(!s) return;
+  $("#scenario").textContent = s.scenario || "(no scenario note)";
+  $("#payload").value = JSON.stringify(s.payload, null, 2);
+  $("#err").style.display="none";
+}
+
+/* ---------- submit ---------- */
+$("#seed").addEventListener("change", e=>{ if(e.target.value) loadSeedIntoEditor(e.target.value); });
+$("#revert").addEventListener("click", ()=>{ const id=$("#seed").value; if(id) loadSeedIntoEditor(id); });
+
+$("#verify").addEventListener("click", async ()=>{
+  const raw = $("#payload").value.trim();
+  if(!raw){ showErr("Paste or load a bill payload first."); return; }
+  let bill; try{ bill = JSON.parse(raw); }catch(e){ showErr("Invalid JSON: "+e.message); return; }
+  $("#err").style.display="none";
+  $("#verify").disabled=true; $("#verify").textContent="Verifying…";
+  try{
+    const res = await api("/freight-bills", {method:"POST", body:JSON.stringify({bill})});
+    renderVerdict(res);
+    focused = res.bill_id;
+    await refresh(); await loadChain(res.bill_id);
+    toast("Verified "+res.bill_id+" → "+titleCase(res.decision));
+  }catch(e){ showErr(e.message); }
+  finally{ $("#verify").disabled=false; $("#verify").textContent="Verify bill"; }
+});
+function showErr(m){ const el=$("#err"); el.textContent=m; el.style.display="block"; }
+
+/* ---------- verdict render ---------- */
+function renderVerdict(r){
+  $("#verdictId").textContent = r.bill_id || "";
+  const matched = r.matched || (r.latest_decision && r.latest_decision.matched) || {};
+  const issues = r.issues || [];
+  const evidence = r.evidence || [];
+  const ents = [["carrier",matched.carrier_id],["contract",matched.contract_id],
+                ["shipment",matched.shipment_id],["bol",matched.bol_id]];
+  $("#verdict").innerHTML = `
+    <div class="stamp" data-d="${r.decision}">
+      <div class="ring"></div>
+      <div class="billno">${r.bill_id}</div>
+      <div class="decision">${titleCase(r.decision)}</div>
+      <div class="statusline">${(r.status||"").replace(/_/g," ")}${r.requires_human_review?" · awaiting reviewer":""}</div>
+      <div class="meter">
+        <div class="track"><div class="fill" style="width:${Math.round((r.confidence||0)*100)}%"></div></div>
+        <div class="mlab"><span>Confidence</span><b>${fmtConf(r.confidence)}</b></div>
+      </div>
+    </div>
+    <div class="matched">
+      ${ents.map(([k,v])=>`<div class="ent ${v?'':'null'}"><span class="k">${k}</span><span class="v">${v||"none"}</span></div>`).join("")}
+    </div>
+    <p class="subhead">Issues found (${issues.length})</p>
+    ${issues.length? `<ul class="issues">${issues.map(renderIssue).join("")}</ul>`
+                   : `<p class="none">No issues — every check reconciled.</p>`}
+    <p class="subhead">Evidence trail</p>
+    <ul class="evidence">${evidence.map(e=>`<li>${escapeHtml(e)}</li>`).join("")||"<li>—</li>"}</ul>
+  `;
+}
+function renderIssue(i){
+  return `<div class="issue"><span class="sev ${i.severity}">${i.severity}</span>
+    <span><span class="code">${i.code}</span><span class="msg">${escapeHtml(i.message||"")}</span></span></div>`;
+}
+function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+/* ---------- review queue ---------- */
+async function loadQueue(){
+  const q = await api("/review-queue");
+  $("#qCount").textContent = q.length? q.length+" waiting" : "empty";
+  const box = $("#queue");
+  if(!q.length){ box.innerHTML = `<div class="none">Nothing waiting. Bills that flag or escalate appear here for a human decision.</div>`; return; }
+  box.innerHTML = q.map(item=>`
+    <div class="qitem">
+      <div class="qtop">
+        <span class="id">${item.bill_id}</span>
+        <span class="tag ${item.proposed_decision}">${titleCase(item.proposed_decision)} · ${fmtConf(item.confidence)}</span>
+      </div>
+      <div class="qmeta">${escapeHtml(item.carrier_name)} · ${item.bill_number} · ${item.lane}</div>
+      <div class="qissues">${(item.issues||[]).map(i=>`<span>${i.code}</span>`).join("")||"<span>no issues</span>"}</div>
+      <div class="review-row">
+        <input type="text" id="note-${item.bill_id}" placeholder="reviewer note (optional)" />
+        <button class="ra approve" data-id="${item.bill_id}" data-act="approve">Approve</button>
+        <button class="ra dispute" data-id="${item.bill_id}" data-act="dispute">Dispute</button>
+        <button class="ra modify" data-id="${item.bill_id}" data-act="modify">Modify</button>
+      </div>
+    </div>`).join("");
+  box.querySelectorAll(".ra").forEach(b=> b.addEventListener("click", onReview));
+  box.querySelectorAll(".qitem .id").forEach(el=> el.addEventListener("click",()=>loadChain(el.textContent)));
+}
+async function onReview(e){
+  const id = e.target.dataset.id, act = e.target.dataset.act;
+  const note = ($("#note-"+id)||{}).value || "";
+  e.target.disabled=true;
+  try{
+    const res = await api("/review/"+id, {method:"POST", body:JSON.stringify({reviewer_decision:act, reviewer_notes:note})});
+    toast(id+" resolved → "+titleCase(res.final_decision));
+    focused=id; await refresh(); await loadChain(id);
+  }catch(err){ toast("Error: "+err.message); e.target.disabled=false; }
+}
+
+/* ---------- evidence chain ---------- */
+async function loadChain(id){
+  if(!id) return; focused=id;
+  $("#chainId").textContent = id;
+  const d = await api("/freight-bills/"+id);
+  const hist = d.decision_history||[];
+  const audit = d.audit_trail||[];
+  $("#chain").innerHTML = `
+    <ul class="timeline">
+      ${hist.map(h=>`
+        <li class="${h.is_final?'final':''}">
+          <div class="when">${fmtTime(h.created_at)}</div>
+          <div class="what">${titleCase(h.decision)}
+            <span class="badge">${h.is_final?'final':'proposed'}</span>
+            <span class="badge">${fmtConf(h.confidence)}</span></div>
+        </li>`).join("") || "<li>No decisions recorded.</li>"}
+    </ul>
+    <p class="subhead" style="margin-top:6px">Audit trail (append-only)</p>
+    <ul class="audit">
+      ${audit.map(a=>`<li><span class="ev">${a.event}</span><span>${fmtTime(a.at)}</span></li>`).join("")||"<li>—</li>"}
+    </ul>`;
+  // also refresh the verdict pane to the latest decision for this bill
+  if(d.latest_decision){
+    renderVerdict({bill_id:d.id, status:d.status, decision:d.latest_decision.decision,
+      confidence:d.latest_decision.confidence, requires_human_review:d.latest_decision.requires_human_review,
+      matched:d.latest_decision.matched, issues:d.latest_decision.issues, evidence:d.latest_decision.evidence});
+    $("#verdictId").textContent = d.id;
+  }
+}
+function fmtTime(t){ if(!t) return ""; try{ return new Date(t).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}); }catch(e){ return t; } }
+
+/* ---------- run all ---------- */
+$("#runAll").addEventListener("click", async ()=>{
+  $("#runAll").disabled=true; $("#runAll").textContent="Running…";
+  const ids = Object.keys(seeds).sort();
+  const rows=[];
+  for(const id of ids){
+    try{ const r = await api("/freight-bills",{method:"POST",body:JSON.stringify({bill_id:id})});
+      rows.push(r);
+    }catch(e){ rows.push({bill_id:id, status:"ERROR", decision:"—", confidence:null, issues:[{code:e.message}]}); }
+  }
+  $("#runPanel").classList.remove("hidden");
+  $("#runBody").innerHTML = rows.map(r=>`
+    <tr data-id="${r.bill_id}">
+      <td>${r.bill_id}</td>
+      <td>${(r.status||"").replace(/_/g," ")}</td>
+      <td><span class="pill ${r.decision}">${titleCase(r.decision)}</span></td>
+      <td>${fmtConf(r.confidence)}</td>
+      <td>${(r.issues||[]).map(i=>i.code).join(", ")||"—"}</td>
+    </tr>`).join("");
+  $("#runBody").querySelectorAll("tr").forEach(tr=> tr.addEventListener("click",()=>loadChain(tr.dataset.id)));
+  await refresh();
+  $("#runAll").disabled=false; $("#runAll").textContent="Run all 10 seeds";
+  toast("Processed "+rows.length+" bills");
+});
+
+/* ---------- reset ---------- */
+$("#reset").addEventListener("click", async ()=>{
+  if(!confirm("Reset the demo? This clears all ingested bills, decisions, and audit history. Reference data is kept.")) return;
+  try{
+    await api("/admin/reset",{method:"POST"});
+    focused=null;
+    $("#verdict").innerHTML = `<div class="verdict-empty">Demo reset. Submit a bill to begin.</div>`;
+    $("#verdictId").textContent=""; $("#chainId").textContent="";
+    $("#chain").innerHTML = `<div class="none">Select or verify a bill to see its decision history and audit trail.</div>`;
+    $("#runPanel").classList.add("hidden");
+    await refresh(); toast("Demo reset to a clean slate");
+  }catch(e){ toast("Reset failed: "+e.message); }
+});
+
+/* ---------- metrics ---------- */
+async function loadMetrics(){
+  const m = await api("/metrics");
+  const fd = m.final_decisions||{}, bs = m.bills_by_status||{};
+  const chips = [
+    ["Approved", fd.auto_approve||0, "var(--approve)"],
+    ["Disputed", fd.dispute||0, "var(--dispute)"],
+    ["In review", bs.WAITING_FOR_REVIEW||0, "var(--review)"],
+    ["Completed", bs.COMPLETED||0, "var(--ink-soft)"],
+    ["Audit events", m.audit_events||0, "var(--ink)"],
+  ];
+  $("#metrics").innerHTML = chips.map(([l,n,c])=>`
+    <div class="chip"><span class="swatch" style="background:${c}"></span>
+      <div><div class="n">${n}</div><div class="l">${l}</div></div></div>`).join("");
+}
+async function refresh(){ await Promise.all([loadQueue(), loadMetrics()]); }
+
+boot();
+</script>
+</body>
+</html>
